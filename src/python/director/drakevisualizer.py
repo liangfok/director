@@ -212,9 +212,12 @@ class Geometry(object):
             print 'warning, cannot find file:', filename
             return []
 
+        print "filename = ", filename
         if filename.endswith('vtm'):
+            print "Obtaining polyDataList using ioUtils.readMultiBlock()"
             polyDataList = ioUtils.readMultiBlock(filename)
         else:
+            print "Obtaining polyDataList using ioUtils.readPolydata()"
             polyDataList = [ioUtils.readPolyData(filename)]
 
         if USE_TEXTURE_MESHES:
@@ -251,21 +254,35 @@ class Geometry(object):
 
         geometry = []
         for polyData in polyDataList:
-            g = Geometry(name, geom, polyData, parentTransform)
+            texture = Geometry.TextureCache.get(Geometry.getTextureFileName(polyData))
+            if texture:
+                color = QtGui.QColor(255, 255, 255)
+            else:
+                color = QtGui.QColor(geom.color[0]*255, geom.color[1]*255, geom.color[2]*255)
+            alpha = geom.color[3]
+            g = Geometry(name, polyData, color, alpha, texture)
             geometry.append(g)
         return geometry
 
+    @staticmethod
+    def createGeometryFromObj(name, geom, parentTransform):
+        meshes, actors = ioUtils.readObjMtl(geom.string_data)
 
-    def __init__(self, name, geom, polyData, parentTransform):
+        geometry = []
+        for mesh, actor in zip(meshes, actors):
+            color = actor.GetProperty().GetColor()
+            alpha = actor.GetProperty().GetOpacity()
+            texture = actor.GetTexture()
+            g = Geometry(name, mesh, color, alpha, texture)
+            geometry.append(g)
+        return geometry
+
+    def __init__(self, name, polyData, color, alpha, texture):
+        print "Geometry constructor called with polyData of type ", type(polyData)
         self.polyDataItem = vis.PolyDataItem(name, polyData, view=None)
-        self.polyDataItem.setProperty('Alpha', geom.color[3])
-        self.polyDataItem.actor.SetTexture(Geometry.TextureCache.get( Geometry.getTextureFileName(polyData) ))
-
-        if self.polyDataItem.actor.GetTexture():
-            self.polyDataItem.setProperty('Color', QtGui.QColor(255, 255, 255))
-
-        else:
-            self.polyDataItem.setProperty('Color', QtGui.QColor(geom.color[0]*255, geom.color[1]*255, geom.color[2]*255))
+        self.polyDataItem.setProperty('Color', color)
+        self.polyDataItem.setProperty('Alpha', alpha)
+        self.polyDataItem.actor.SetTexture(texture)
 
         if USE_SHADOWS:
             self.polyDataItem.shadowOn()
@@ -278,8 +295,13 @@ class Link(object):
 
         self.geometry = []
         for g in link.geom:
-            self.geometry.extend(Geometry.createGeometry(link.name + ' geometry data', g, self.transform))
-
+            filename = Geometry.resolvePackageFilename(g.string_data)
+            print "Link filename = ", filename
+            if filename.endswith("obj"):
+                print "Loading OBJ!"
+                self.geometry.extend(Geometry.createGeometryFromObj(link.name + ' geometry data', g, self.transform))
+            else:
+                self.geometry.extend(Geometry.createGeometry(link.name + ' geometry data', g, self.transform))
 
     def setTransform(self, pos, quat):
         self.transform = transformUtils.transformFromPose(pos, quat)
