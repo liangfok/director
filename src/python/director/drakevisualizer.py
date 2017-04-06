@@ -165,7 +165,7 @@ class Geometry(object):
             imageFile = textureFileName
 
         if not os.path.isfile(imageFile):
-            print 'cannot find texture file:', textureFileName
+            print 'failed to find image file:', imageFile
             return
 
         image = ioUtils.readImage(imageFile)
@@ -212,12 +212,9 @@ class Geometry(object):
             print 'warning, cannot find file:', filename
             return []
 
-        print "filename = ", filename
         if filename.endswith('vtm'):
-            print "Obtaining polyDataList using ioUtils.readMultiBlock()"
             polyDataList = ioUtils.readMultiBlock(filename)
         else:
-            print "Obtaining polyDataList using ioUtils.readPolydata()"
             polyDataList = [ioUtils.readPolyData(filename)]
 
         if USE_TEXTURE_MESHES:
@@ -251,7 +248,6 @@ class Geometry(object):
     @staticmethod
     def createGeometry(name, geom, parentTransform):
         polyDataList = Geometry.createPolyDataForGeometry(geom)
-
         geometry = []
         for polyData in polyDataList:
             texture = Geometry.TextureCache.get(Geometry.getTextureFileName(polyData))
@@ -267,7 +263,6 @@ class Geometry(object):
     @staticmethod
     def createGeometryFromObj(name, geom, parentTransform):
         meshes, actors = ioUtils.readObjMtl(geom.string_data)
-
         geometry = []
         for mesh, actor in zip(meshes, actors):
             color = actor.GetProperty().GetColor()
@@ -278,7 +273,6 @@ class Geometry(object):
         return geometry
 
     def __init__(self, name, polyData, color, alpha, texture):
-        print "Geometry constructor called with polyData of type ", type(polyData)
         self.polyDataItem = vis.PolyDataItem(name, polyData, view=None)
         self.polyDataItem.setProperty('Color', color)
         self.polyDataItem.setProperty('Alpha', alpha)
@@ -296,9 +290,7 @@ class Link(object):
         self.geometry = []
         for g in link.geom:
             filename = Geometry.resolvePackageFilename(g.string_data)
-            print "Link filename = ", filename
             if filename.endswith("obj"):
-                print "Loading OBJ!"
                 self.geometry.extend(Geometry.createGeometryFromObj(link.name + ' geometry data', g, self.transform))
             else:
                 self.geometry.extend(Geometry.createGeometry(link.name + ' geometry data', g, self.transform))
